@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 
 class Eventtxt2pic():
     def __init__(self,root):
@@ -7,7 +8,9 @@ class Eventtxt2pic():
         self.savefile=root
         self.shape=(180,240)
         self.emptyImage=np.full(self.shape,128,dtype='uint8')
-        self.timeinteval=0.0128
+        #self.timeinteval=0.0128 盒子的
+        self.timeinteval=0.015
+        self.point_each=6400
         self.fill_frame=self.fill_frame2  ##确定堆叠方式
     def fill_frame1(self,emptyImage,col, row, polarity):
         '以叠加方式堆叠event帧'
@@ -21,10 +24,12 @@ class Eventtxt2pic():
             emptyImage[col][row] = 255
         elif (polarity == 0):
             emptyImage[col][row] = 0
-    def start_stack(self):
+    def start_stack_SBT(self):
         filenamepre = 'event_'
         piccount=0
         pointnum=1
+        if not os.path.exists(self.savefile+'/recovery'):
+            os.mkdir(self.savefile+'/recovery')
         with open(self.eventfile) as f:
             while True:
                 line = f.readline()
@@ -53,7 +58,41 @@ class Eventtxt2pic():
             print("Program has recovered {} Event-frames!".format(piccount))
         print("Finish recovering!")
 
+    def start_stack_SBE(self):
+        filenamepre = 'event_'
+        piccount=0
+        pointnum=1
+        if not os.path.exists(self.savefile+'/recovery_SBE'):
+            os.mkdir(self.savefile+'/recovery_SBE')
+        with open(self.eventfile) as f:
+            while True:
+                line = f.readline()
+                if not line: break
+                event = line.split()
+                timestamp = float(event[0])
+                row = int(event[1])
+                col = int(event[2])
+                polar = int(event[3])
+                if (pointnum<self.point_each):
+                    self.fill_frame(self.emptyImage, col, row, polar)
+                    print("正在填充第{}张图像的第{}个event像素点！".format(piccount, pointnum))
+                    pointnum = pointnum + 1
+                else:
+                    filename = filenamepre + str(piccount).zfill(8)
+                    cv2.imwrite((self.savefile+("/recovery_SBE/{}.png".format(filename))), self.emptyImage)
+                    print("Program has recovered {} frames!".format(piccount))
+                    piccount = piccount + 1
+                    pointnum = 1
+                    self.emptyImage = np.full(self.shape, 128, dtype='uint8')
+                    self.fill_frame(self.emptyImage, col, row, polar)
+                    print("正在填充第{}张图像的第{}个event像素点！".format(piccount, pointnum))
+                    pointnum = pointnum + 1
+            filename = filenamepre + str(piccount).zfill(8)
+            cv2.imwrite((self.savefile + ("/recovery_SBE/{}.png".format(filename))), self.emptyImage)
+            print("Program has recovered {} Event-frames!".format(piccount))
+        print("Finish recovering!")
+
 if __name__=='__main__':
     eventfile='../data/urban'
     txt2pic=Eventtxt2pic(eventfile)
-    txt2pic.start_stack()
+    txt2pic.start_stack_SBE()
